@@ -13,6 +13,8 @@ export default function WebPullToRefresh() {
 		// ID of the element holding pull to refresh loading area
 		ptrEl: 'ptr',
 
+		scrollEl: document.body,
+
 		// wrapper element holding scollable
 		bodyEl: document.body,
 
@@ -61,7 +63,8 @@ export default function WebPullToRefresh() {
 			distanceToRefresh: params.distanceToRefresh || defaults.distanceToRefresh,
 			loadingFunction: params.loadingFunction || defaults.loadingFunction,
 			resistance: params.resistance || defaults.resistance,
-			hammerOptions: params.hammerOptions || {}
+			hammerOptions: params.hammerOptions || {},
+			scrollEl: params.scrollEl || defaults.scrollEl
 		};
 
 		if ( ! options.contentEl || ! options.ptrEl ) {
@@ -70,14 +73,28 @@ export default function WebPullToRefresh() {
 
 		bodyClass = options.bodyEl.classList;
 
-		var h = new Hammer( options.contentEl, options.hammerOptions );
+		// var h = new Hammer( options.contentEl, options.hammerOptions );
 
-		h.get( 'pan' ).set( { direction: Hammer.DIRECTION_VERTICAL } );
+		let _startingPos = -1;
+		options.contentEl.addEventListener('touchstart', function (e) {
+			_startingPos = e.touches[0].clientY;
+			_panStart(e);
+		});
+		options.contentEl.addEventListener('touchend', _panEnd);
 
-		h.on( 'panstart', _panStart );
-		h.on( 'pandown', _panDown );
-		h.on( 'panup', _panUp );
-		h.on( 'panend', _panEnd );
+		options.contentEl.addEventListener('touchmove', function (e) {
+			if (e.touches[0].clientY > _startingPos) {
+				e.distance = e.touches[0].clientY - _startingPos;
+				_panDown(e);
+			}
+			if (e.touches[0].clientY < _startingPos) {
+				e.distance = _startingPos - e.touches[0].clientY;
+				_panUp(e);
+			}
+		});
+
+		// Hide ptr element
+		options.ptrEl.style.visibility = 'hidden';
 	};
 
 	/**
@@ -86,10 +103,11 @@ export default function WebPullToRefresh() {
 	 * @param {object} e - Event object
 	 */
 	var _panStart = function(e) {
-		pan.startingPositionY = options.bodyEl.scrollTop;
+		pan.startingPositionY = options.scrollEl.scrollTop;
 
 		if ( pan.startingPositionY === 0 ) {
 			pan.enabled = true;
+			options.ptrEl.style.visibility = 'visible';
 		}
 	};
 
@@ -162,7 +180,9 @@ export default function WebPullToRefresh() {
 			return;
 		}
 
-		e.preventDefault();
+		if (pan.distance !== 0) {
+			e.preventDefault();
+		}
 
 		options.contentEl.style.transform = options.contentEl.style.webkitTransform = '';
 		options.ptrEl.style.transform = options.ptrEl.style.webkitTransform = '';
@@ -212,6 +232,8 @@ export default function WebPullToRefresh() {
 		};
 
 		options.bodyEl.addEventListener( 'transitionend', bodyClassRemove, false );
+
+		options.ptrEl.style.visibility = 'hidden';
 	};
 
 	return {
